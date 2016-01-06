@@ -926,7 +926,7 @@ class DataProcessor(object):
         return True
 
 
-def _create_message(obj, filename, uri, params, publish_topic=None, uid=None):
+def _create_message(obj, filename, uri, params, publish_topic=None, uid=None, source_uri=None):
     """Create posttroll message.
     """
     to_send = obj.info.copy()
@@ -956,6 +956,8 @@ def _create_message(obj, filename, uri, params, publish_topic=None, uid=None):
     # FIXME: fishy: what if the uri already has a scheme ?
     to_send["uri"] = urlunsplit(("file", "", uri, "", ""))
     to_send["uid"] = uid or os.path.basename(filename)
+    to_send["source_uri"] = source_uri
+    
     # we should have more info on format...
     fformat = os.path.splitext(filename)[1][1:]
     if fformat.startswith("tif"):
@@ -1161,7 +1163,7 @@ class DataWriter(Thread):
                             msg = _create_message(obj, os.path.basename(fname),
                                                   fname, params,
                                                   publish_topic=self._publish_topic,
-                                                  uid=uid)
+                                                  uid=uid, source_uri=params['uri'])
                             pub.send(str(msg))
                             LOGGER.debug("Sent message %s", str(msg))
                 except Exception as e:
