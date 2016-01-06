@@ -32,6 +32,7 @@ import sys
 import time
 from posttroll.publisher import NoisyPublisher
 from posttroll.message import Message
+from trollduction import helper_functions
 from trollsift import Parser
 from ConfigParser import ConfigParser
 import logging
@@ -189,6 +190,7 @@ class EventHandler(ProcessEvent):
             while self.info["start_time"] > self.info["end_time"]:
                 self.info["end_time"] += dt.timedelta(days=1)
 
+
 class NewThreadedNotifier(ThreadedNotifier):
 
     '''Threaded notifier class
@@ -231,36 +233,6 @@ def create_notifier(topic, instrument, posttroll_port, filepattern,
         manager.add_watch(monitored_dir, event_mask, rec=True)
 
     return notifier
-
-
-def parse_aliases(config):
-    '''Parse aliases from the config.
-
-    Aliases are given in the config as:
-
-    {'alias_<name>': 'value:alias'}, or
-    {'alias_<name>': 'value1:alias1|value2:alias2'},
-
-    where <name> is the name of the key which value will be
-    replaced. The later form is there to support several possible
-    substitutions (eg. '2' -> '9' and '3' -> '10' in the case of MSG).
-
-    '''
-    aliases = {}
-
-    for key in config:
-        if 'alias' in key:
-            alias = config[key]
-            new_key = key.replace('alias_', '')
-            if '|' in alias or ':' in alias:
-                parts = alias.split('|')
-                aliases2 = {}
-                for part in parts:
-                    key2, val2 = part.split(':')
-                    aliases2[key2] = val2
-                alias = aliases2
-            aliases[new_key] = alias
-    return aliases
 
 
 def main():
@@ -359,7 +331,7 @@ def main():
         except KeyError:
             history = 0
 
-        aliases = parse_aliases(config)
+        aliases = helper_functions.parse_aliases(config)
         tbus_orbit = bool(config.get("tbus_orbit", False))
 
         try:
