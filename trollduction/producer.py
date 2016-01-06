@@ -39,6 +39,7 @@ TODO:
 from .listener import ListenerContainer
 from mpop.satellites import GenericFactory as GF
 import time
+import datetime
 from mpop.projector import get_area_def
 from threading import Thread
 from pyorbital import astronomy
@@ -465,7 +466,7 @@ class DataProcessor(object):
         # TODO: this should be fixed in mpop.
         global_data.info.update(mda)
         global_data.info['time'] = time_slot
-
+        global_data.info['time_eos'] = time_slot + datetime.timedelta(minutes=15)
         return global_data
 
     def save_to_netcdf(self, data, item, params):
