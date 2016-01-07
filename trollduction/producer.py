@@ -840,11 +840,19 @@ class DataProcessor(object):
                     continue
 
             try:
+                # Collect optional composite parameters from config
+                composite_params = {}
+                cp = product.find('composite_params')
+                if cp is not None:
+                    composite_params = \
+                        {item.tag: helper_functions.eval_default(item.text)
+                         for item in cp.getchildren()}
+
                 # Check if this combination is defined
                 func = getattr(self.local_data.image, product.attrib['id'])
                 LOGGER.debug("Generating composite \"%s\"",
                              product.attrib['id'])
-                img = func()
+                img = func(**composite_params)
                 img.info.update(self.global_data.info)
                 img.info["product_name"] = \
                     product.attrib.get("name", product.attrib["id"])
@@ -863,7 +871,8 @@ class DataProcessor(object):
                                  product.attrib['name'],
                                  area.attrib['name'])
             else:
-                self.writer.write(img, product, params)
+                file_items = [x for x in product if x.tag == 'file']
+                self.writer.write(img, file_items, params)
 
         # log and publish completion of this area def
         LOGGER.info('Area %s completed', area.attrib['name'])
@@ -1154,7 +1163,7 @@ class DataWriter(Thread):
                                             local_params)
                             
                             save_params = self.get_save_arguments(copy, local_params)
-                            
+                            # LOGGER.info("!!! arealon %s arealat %s areasap %s", obj.area.lons.shape, obj.area.lats.shape, obj.area.shape)
                             LOGGER.debug("Saving %s", fname)
                             if not saved:
                                 try:
@@ -1215,7 +1224,7 @@ class DataWriter(Thread):
         save_kwords = {}
 
         fp = fileelem.find('format_params')
-        if fp:
+        if fp is not None:
             fpp = {item.tag: item.text for item in fp.getchildren()}
             save_kwords.update(fpp)
             
