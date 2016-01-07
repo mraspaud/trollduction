@@ -792,6 +792,7 @@ class DataProcessor(object):
 
         return params
 
+    
     def draw_images(self, area):
         '''Generate images from local data using given area name and
         product definitions.
@@ -1123,7 +1124,7 @@ class DataWriter(Thread):
                                 del attrib[key]
                         if 'format' not in attrib:
                             attrib.setdefault('format',
-                                              os.path.splitext(item.text)[1][1:])
+                                              os.path.splitext(item.text.strip())[1][1:])
 
                         key = tuple(sorted(attrib.items()))
                         sorted_items.setdefault(key, []).append(item)
@@ -1149,19 +1150,22 @@ class DataWriter(Thread):
                             output_dir = copy.attrib.get("output_dir",
                                                          params["output_dir"])
 
-                            fname = compose(os.path.join(output_dir, copy.text),
+                            fname = compose(os.path.join(output_dir, copy.text.strip()),
                                             local_params)
+                            
+                            save_params = self.get_save_arguments(copy, local_params)
+                            
                             LOGGER.debug("Saving %s", fname)
                             if not saved:
                                 try:
                                     obj.save(fname,
                                              fformat=fformat,
-                                             compression=copy.attrib.get("compression", 6))
+                                             **save_params)
                                 except IOError: # retry once
                                     try:
                                         obj.save(fname,
                                                  fformat=fformat,
-                                                 compression=copy.attrib.get("compression", 6))
+                                                 **save_params)
                                     except IOError:
                                         LOGGER.exception("Can't save file %s", fname)
                                         continue
@@ -1207,6 +1211,33 @@ class DataWriter(Thread):
                 finally:
                     self.prod_queue.task_done()
 
+    def get_save_arguments(self, fileelem, params):
+        save_kwords = {}
+
+        fp = fileelem.find('format_params')
+        if fp:
+            fpp = {item.tag: item.text for item in fp.getchildren()}
+            save_kwords.update(fpp)
+            
+        if 'format_params' in fileelem:
+            save_kwords.update(fileelem['format_params'])
+
+        # set some defaults
+        if 'compression' not in save_kwords:
+            save_kwords['compression'] = 6
+
+        if 'blocksize' not in save_kwords:
+            save_kwords['blocksize'] = 0
+
+        if 'nbits' in save_kwords:
+            save_kwords['tags'] = {'NBITS': save_kwords['nbits']}
+            del save_kwords['nbits']
+        elif 'nbits' in params:
+            save_kwords['tags'] = {'NBITS':
+                                   params['nbits']}
+
+        return save_kwords
+    
     def write(self, obj, item, params):
         '''Write to queue.
         '''
