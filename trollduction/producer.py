@@ -396,6 +396,7 @@ class DataProcessor(object):
     """
 
     def __init__(self, publish_topic=None,
+                 process_num=0,
                  wait_for_channel_cfg={},
                  viewZenCacheManager=None):
         self.global_data = None
@@ -406,6 +407,7 @@ class DataProcessor(object):
         self.wait_for_channel_cfg = wait_for_channel_cfg
         self.writer = DataWriter(publish_topic=self._publish_topic)
         self.writer.start()
+        self.process_num = process_num
         self.viewZenCacheManager = viewZenCacheManager
 
     def set_publish_topic(self, publish_topic):
@@ -582,6 +584,15 @@ class DataProcessor(object):
             do_generic_coverage = False
 
             for area_item in group.data:
+
+                if 'process_num' in area_item.attrib:
+                    if eval(area_item.attrib['process_num']) != self.process_num:
+                        LOGGER.info('Skipping area assigned to process '
+                                    'number %s (own num: %s)'
+                                    % (area_item.attrib['process_num'],
+                                       self.process_num))
+                        continue
+
                 try:
                     if not covers(self.global_data.overpass, area_item):
                         skip.append(area_item)
@@ -1348,6 +1359,7 @@ class Trollduction(object):
         self.data_processor = \
             DataProcessor(publish_topic=self.td_config.get('publish_topic',
                                                            None),
+                          process_num = config["process_num"],
                           wait_for_channel_cfg=self.wait_for_channel_cfg,
                           viewZenCacheManager=self.viewZenCacheManager)
 

@@ -34,6 +34,24 @@ import signal
 import sys
 import os
 import time
+from tempfile import mkstemp
+
+
+def create_instance_log_config(orig_log_config, process_num):
+    _, temp_file = mkstemp()
+    try:
+        with open(orig_log_config) as infile:
+            with open(temp_file, 'w') as outfile:
+                replacements = {'%PROCNUM%': '{0:02d}'.format(process_num)}
+                for line in infile:
+                    for src, target in replacements.iteritems():
+                        line = line.replace(src, target)
+                    outfile.write(line)
+    except:
+        os.remove(temp_file)
+        raise
+    return temp_file
+
 
 if __name__ == '__main__':
 
@@ -46,6 +64,11 @@ if __name__ == '__main__':
                         type=str,
                         default='',
                         help="The item in the file with configuration.")
+    parser.add_argument("-N", "--process_num", dest="process_num",
+                        type=int,
+                        default=0,
+                        help="the process number used to assign workload "
+                        "from product configuration")
 
     args = parser.parse_args()
 
@@ -73,7 +96,11 @@ if __name__ == '__main__':
     except NoOptionError:
         logging.basicConfig()
     else:
-        logging.config.fileConfig(log_config)
+        inst_log_config = create_instance_log_config(log_config,
+                                                     args.process_num)
+        logging.config.fileConfig(inst_log_config)
+        if os.path.exists(inst_log_config):
+            os.remove(inst_log_config)
 
     logger = logging.getLogger("trollduction")
 
@@ -81,6 +108,7 @@ if __name__ == '__main__':
     cfg = dict(config.items(args.config_item))
     cfg["config_item"] = args.config_item
     cfg["config_file"] = args.config_file
+    cfg["process_num"] = args.process_num
     if "timezone" in cfg:
         print "Setting timezone to %s" % cfg["timezone"]
         os.environ["TZ"] = cfg["timezone"]
@@ -98,9 +126,12 @@ if __name__ == '__main__':
 
     def shutdown(*args):
         logger.info("l2processor shutting down")
+        print "starting shutdown procedure"
         del args
         trd.shutdown()
         logging.shutdown()
+        print "shutdown procedure finished"
+        os._exit(0)
 
     signal.signal(signal.SIGTERM, shutdown)
 
@@ -108,7 +139,7 @@ if __name__ == '__main__':
     try:
         trd.run_single()
     except KeyboardInterrupt:
-        logging.shutdown()
+        shutdown()
     except:
         logger.exception("Trollduction died!")
         trd.shutdown()
