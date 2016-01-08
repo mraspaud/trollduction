@@ -40,6 +40,7 @@ from .listener import ListenerContainer
 from mpop.satellites import GenericFactory as GF
 import time
 import datetime
+import glob
 from mpop.projector import get_area_def
 from threading import Thread
 from pyorbital import astronomy
@@ -51,6 +52,7 @@ import logging.handlers
 from fnmatch import fnmatch
 from trollduction import helper_functions
 from trollsift import compose
+from trollsift import Parser
 from urlparse import urlparse, urlunsplit
 import socket
 import shutil
@@ -394,12 +396,14 @@ class DataProcessor(object):
     """
 
     def __init__(self, publish_topic=None,
+                 wait_for_channel_cfg={},
                  viewZenCacheManager=None):
         self.global_data = None
         self.local_data = None
         self.product_config = None
         self._publish_topic = publish_topic
         self._data_ok = True
+        self.wait_for_channel_cfg = wait_for_channel_cfg
         self.writer = DataWriter(publish_topic=self._publish_topic)
         self.writer.start()
         self.viewZenCacheManager = viewZenCacheManager
@@ -495,6 +499,9 @@ class DataProcessor(object):
                 LOGGER.info("Unloading data after netcdf4 conversion.")
                 data.unload(*loaded_channels)
 
+    def set_wait_for_channel_cfg(self, wait_for_channel_cfg):
+        self.wait_for_channel_cfg = wait_for_channel_cfg
+        
     def run(self, product_config, msg):
         """Process the data
         """
@@ -611,6 +618,8 @@ class DataProcessor(object):
                 if "resolution" in group.info:
                     keywords["resolution"] = int(group.resolution)
 
+                self.check_ready_to_read(req_channels)
+                
                 self.global_data.load(req_channels, **keywords)
                 LOGGER.debug("loaded data: %s", str(self.global_data))
             except (IndexError, IOError, DecodeError, StructError):
@@ -744,6 +753,37 @@ class DataProcessor(object):
 
         return def_names
 
+    def check_ready_to_read(self, channels_to_load):
+        lcase_channels_to_load = [str(x).lower() for x in channels_to_load]
+        LOGGER.debug(
+            'check if ready to load:: %s', ', '.join(lcase_channels_to_load))
+        for ch_name, wait_for_ch_cfg in self.wait_for_channel_cfg.iteritems():
+            if ch_name in lcase_channels_to_load:
+                par = Parser(wait_for_ch_cfg['pattern'])
+                info_dict = self.get_parameters()
+                pattern = par.compose(info_dict)
+                if self.wait_until_exists(pattern,
+                                     wait_for_ch_cfg['timeout'],
+                                     wait_for_ch_cfg['wait_after_found']):
+                    LOGGER.debug('found %s', pattern)
+                else:
+                    LOGGER.error('timeout! did not found %s', pattern)
+
+    def wait_until_exists(self, pattern, timeout_sec, wait_after_found_sec):
+        ''' waits for files matching the given pattern with
+        '''
+        waited = 0
+        wait_period = 5
+
+        while waited < timeout_sec:
+            if glob.glob(pattern):
+                time.sleep(wait_after_found_sec)
+                return True
+            time.sleep(wait_period)
+            waited += wait_period
+
+        return False
+
     def check_satellite(self, config):
         '''Check if the current configuration allows the use of this
         satellite.
@@ -777,16 +817,17 @@ class DataProcessor(object):
 
         return True
 
-    def get_parameters(self, item):
+    def get_parameters(self, item = None):
         """Get the parameters for filename sifting.
         """
 
         params = self.product_config.attrib.copy()
 
         params.update(self.global_data.info)
-        for key, attrib in item.attrib.items():
-            params["".join((item.tag, key))] = attrib
-        params.update(item.attrib)
+        if item is not None:
+            for key, attrib in item.attrib.items():
+                params["".join((item.tag, key))] = attrib
+            params.update(item.attrib)
 
         params['aliases'] = self.product_config.aliases.copy()
 
@@ -1307,6 +1348,7 @@ class Trollduction(object):
         self.data_processor = \
             DataProcessor(publish_topic=self.td_config.get('publish_topic',
                                                            None),
+                          wait_for_channel_cfg=self.wait_for_channel_cfg,
                           viewZenCacheManager=self.viewZenCacheManager)
 
     def update_td_config_from_file(self, fname, config_item=None):
@@ -1331,7 +1373,7 @@ class Trollduction(object):
             #            self.listener.restart_listener('file')
             self.listener.restart_listener(self.td_config['topics'].split(','))
             LOGGER.info("Listener restarted")
-
+        self.set_wait_for_channel_cfg()
         try:
             self.update_product_config(self.td_config['product_config_file'])
         except KeyError:
@@ -1354,6 +1396,26 @@ class Trollduction(object):
             self.td_config['product_config_file'] = fname
 
         LOGGER.info('Product config read from %s', fname)
+
+    def set_wait_for_channel_cfg(self):
+        '''Parses configuration to waiting for a channel
+        '''
+        key_prefix = 'wait_for_channel_'
+        wait_for_channel_cfg = {}
+        for key, value in self.td_config.iteritems():
+            if key.startswith(key_prefix):
+                ch_name = key[len(key_prefix):]
+                vals = value.split('|')
+                pattern = vals[0]
+                timeout = eval(vals[1])
+                wait_after_found = eval(vals[2])
+                wait_for_channel_cfg[ch_name] = {
+                    'pattern': pattern,
+                    'timeout': timeout,
+                    'wait_after_found': wait_after_found}
+        self.wait_for_channel_cfg = wait_for_channel_cfg
+        if self.data_processor is not None:
+            self.data_processor.set_wait_for_channel_cfg(wait_for_channel_cfg)
 
     def cleanup(self):
         '''Cleanup Trollduction before shutdown.
