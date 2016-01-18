@@ -587,10 +587,12 @@ class DataProcessor(object):
 
                 if 'process_num' in area_item.attrib:
                     if eval(area_item.attrib['process_num']) != self.process_num:
-                        LOGGER.info('Skipping area assigned to process '
+                        LOGGER.info('Skipping area %s assigned to process '
                                     'number %s (own num: %s)'
-                                    % (area_item.attrib['process_num'],
+                                    % (area_item.attrib['id'],
+                                       area_item.attrib['process_num'],
                                        self.process_num))
+                        skip.append(area_item)
                         continue
 
                 try:
