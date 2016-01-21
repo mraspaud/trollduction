@@ -1216,9 +1216,9 @@ class DataWriter(Thread):
 
         fp = fileelem.find('format_params')
         if fp:
-            fpp = {item.tag: item.text for item in fp.getchildren()}
+            fpp = dict((item.tag, item.text) for item in fp.getchildren())
             save_kwords.update(fpp)
-            
+
         if 'format_params' in fileelem:
             save_kwords.update(fileelem['format_params'])
 
