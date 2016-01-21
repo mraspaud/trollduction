@@ -844,9 +844,9 @@ class DataProcessor(object):
                 composite_params = {}
                 cp = product.find('composite_params')
                 if cp is not None:
-                    composite_params = \
-                        {item.tag: helper_functions.eval_default(item.text)
-                         for item in cp.getchildren()}
+                    composite_params = dict(
+                        (item.tag, helper_functions.eval_default(item.text))
+                        for item in cp.getchildren())
 
                 # Check if this combination is defined
                 func = getattr(self.local_data.image, product.attrib['id'])
