@@ -116,14 +116,16 @@ class ProductList(object):
 
         # replace area ids with actual xml area items
         groups = []
+        tempprodlist = list(self.prodlist)
         for group in self.groups:
             new_group = Dataset([], **group.info)
             for area_id in group.data:
                 assigned = False
-                for area in self.prodlist:
+                for area in tempprodlist:
                     if area.attrib["id"] == area_id:
                         new_group.data.append(area)
                         assigned = True
+                        tempprodlist.remove(area)
                         break
                 if not assigned:
                     LOGGER.warning("Couldn't find area %s in product list",
