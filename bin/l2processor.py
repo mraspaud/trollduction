@@ -25,10 +25,10 @@
 ./l2processor.py -c /path/to/master_config.ini -C noaa_hrpt
 """
 
-from trollduction.producer import Trollduction
 import argparse
 import logging
 import logging.config
+from trollduction.producer import Trollduction
 from ConfigParser import ConfigParser, NoOptionError
 import signal
 import sys
@@ -98,7 +98,8 @@ if __name__ == '__main__':
     else:
         inst_log_config = create_instance_log_config(log_config,
                                                      args.process_num)
-        logging.config.fileConfig(inst_log_config)
+        logging.config.fileConfig(inst_log_config,
+                                  disable_existing_loggers=False)
         if os.path.exists(inst_log_config):
             os.remove(inst_log_config)
 
