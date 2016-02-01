@@ -396,6 +396,7 @@ class DataProcessor(object):
     """
 
     def __init__(self, publish_topic=None,
+                 nameservers=[],
                  process_num=0,
                  wait_for_channel_cfg={},
                  viewZenCacheManager=None):
@@ -405,7 +406,8 @@ class DataProcessor(object):
         self._publish_topic = publish_topic
         self._data_ok = True
         self.wait_for_channel_cfg = wait_for_channel_cfg
-        self.writer = DataWriter(publish_topic=self._publish_topic)
+        self.writer = DataWriter(publish_topic=self._publish_topic,
+                                 nameservers=nameservers)
         self.writer.start()
         self.process_num = process_num
         self.viewZenCacheManager = viewZenCacheManager
@@ -1155,10 +1157,11 @@ class DataWriter(Thread):
     we don't want to block processing.
     """
 
-    def __init__(self, publish_topic=None):
+    def __init__(self, publish_topic=None, nameservers=[]):
         Thread.__init__(self)
         self.prod_queue = Queue.Queue()
         self._publish_topic = publish_topic
+        self._nameservers = nameservers
         self._loop = True
 
     def set_publish_topic(self, publish_topic):
@@ -1168,7 +1171,7 @@ class DataWriter(Thread):
     def run(self):
         """Run the thread.
         """
-        with Publish("l2producer") as pub:
+        with Publish("l2producer", nameservers=self._nameservers) as pub:
             while self._loop:
                 try:
                     obj, file_items, params = self.prod_queue.get(True, 1)
@@ -1358,9 +1361,12 @@ class Trollduction(object):
         self.viewZenCacheManager = ViewZenithAngleCacheManager(
                 self.td_config.get('tle_path', ''), aliases)
 
+        nameservers = self.td_config.get('nameservers','').split(',')
+        
         self.data_processor = \
             DataProcessor(publish_topic=self.td_config.get('publish_topic',
                                                            None),
+                          nameservers=nameservers,
                           process_num = config["process_num"],
                           wait_for_channel_cfg=self.wait_for_channel_cfg,
                           viewZenCacheManager=self.viewZenCacheManager)
