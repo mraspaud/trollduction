@@ -1220,6 +1220,7 @@ class DataWriter(Thread):
                                             local_params)
                             
                             save_params = self.get_save_arguments(copy, local_params)
+                            obj.repl_fill_val_in_data = int(save_params.pop("repl_fill_val_in_data", None))
                             # LOGGER.info("!!! arealon %s arealat %s areasap %s", obj.area.lons.shape, obj.area.lats.shape, obj.area.shape)
                             LOGGER.debug("Saving %s", fname)
                             if not saved:
@@ -1301,7 +1302,10 @@ class DataWriter(Thread):
         elif 'nbits' in params:
             save_kwords['tags'] = {'NBITS':
                                    params['nbits']}
-
+            
+        if 'repl_fill_val_in_data' not in save_kwords:
+            save_kwords['repl_fill_val_in_data'] = params.get('repl_fill_val_in_data', None)
+            
         return save_kwords
     
     def write(self, obj, item, params):
