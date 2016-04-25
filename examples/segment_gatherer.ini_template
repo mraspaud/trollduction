@@ -1,0 +1,52 @@
+[ears-viirs]
+# Pattern used to identify time slots and segments.  NOTE: this
+# pattern is not used in forming the metadata sent forward, the
+# published metadata comes directly from eg. trollstalker.
+pattern = SV{segment}C_{orig_platform_name}_d{start_time:%Y%m%d_t%H%M%S}{start_decimal:1d}_e{end_time:%H%M%S}{end_decimal:1d}_b{orbit_number:5d}_c{proctime:s}_eum_ops.h5
+# Segments critical to production
+critical_files =
+# These segments we want to have, but it's still ok if they are missed
+wanted_files = :M,:DNB
+# All possible segments
+all_files = :M,:DNB
+# Listen to messages with this topic
+topics = /EARS/Suomi-NPP/viirs/1b
+# Publish the dataset with this topic
+publish_topic = /segment-EARS/Suomi-NPP/viirs/1b
+# Time to wait after the first segment, in seconds
+timeliness = 240
+# Name of a time field in the pattern above
+time_name = start_time
+# Comma separated list of tag names in the pattern that vary between different
+# segments of the same time slot
+variable_tags = proctime,proc_decimal
+
+[ears-pps]
+pattern = W_XX-EUMETSAT-Darmstadt,SING+LEV+SAT,{orig_platform_name}+{segment}_C_EUMS_{nominal_time:%Y%m%d%H%M%S}_{orbit_number:5d}.nc
+critical_files = 
+wanted_files = :CTTH,:CT,:CMA
+all_files = :CTTH,:CT,:CMA
+topics = /test-stalker/4/dev
+publish_topic = /test-geo_gatherer/4/dev
+timeliness = 1200
+time_name = nominal_time
+
+[msg]
+pattern = H-000-{orig_platform_name:_<6s}-{orig_platform_name:4s}________-{channel_name:_<9s}-{segment:_<9s}-{nominal_time:%Y%m%d%H%M}-__
+critical_files = :PRO,:EPI
+wanted_files = VIS006:6-8,VIS008:6-8,IR_016:6-8,IR_039:6-8,WV_062:6-8,WV_073:6-8,IR_087:6-8,IR_097:6-8,IR_108:6-8,IR_120:6-8,IR_134:6-8,HRV:22-24
+all_files = VIS006:1-8,VIS008:1-8,IR_016:1-8,IR_039:1-8,WV_062:1-8,WV_073:1-8,IR_087:1-8,IR_097:1-8,IR_108:1-8,IR_120:1-8,IR_134:1-8,HRV:1-24
+topics = /foo/bar
+publish_topic = /pub/foo/bar
+timeliness = 900
+time_name = nominal_time
+
+[rss]
+pattern = H-000-{orig_platform_name:_<6s}-{orig_platform_name:4s}_RSS____-{channel_name:_<9s}-{segment:_<9s}-{nominal_time:%Y%m%d%H%M}-__
+critical_files = :PRO,:EPI
+wanted_files = VIS006:6-8,VIS008:6-8,IR_016:6-8,IR_039:6-8,WV_062:6-8,WV_073:6-8,IR_087:6-8,IR_097:6-8,IR_108:6-8,IR_120:6-8,IR_134:6-8,HRV:22-24
+all_files = VIS006:6-8,VIS008:6-8,IR_016:6-8,IR_039:6-8,WV_062:6-8,WV_073:6-8,IR_087:6-8,IR_097:6-8,IR_108:6-8,IR_120:6-8,IR_134:6-8,HRV:16-24
+topics = /foo/bar
+publish_topic = /pub/foo/bar
+timeliness = 300
+time_name = nominal_time

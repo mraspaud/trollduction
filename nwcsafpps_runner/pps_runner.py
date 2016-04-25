@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2015 Adam.Dybbroe
+# Copyright (c) 2014, 2015, 2016 Adam.Dybbroe
 
 # Author(s):
 
@@ -194,7 +194,7 @@ def terminate_process(popen_obj, scene):
     return
 
 
-def pps_worker(semaphore_obj, scene, job_id, publish_q):
+def pps_worker(semaphore_obj, scene, job_id, publish_q, input_msg):
     """Spawn/Start a PPS run on a new thread if available
 
         scene = {'platform_name': platform_name,
@@ -306,7 +306,9 @@ def pps_worker(semaphore_obj, scene, job_id, publish_q):
                 filename = os.path.split(result_file)[1]
                 LOG.info("file to publish = " + str(filename))
 
-                to_send = {}
+                to_send = input_msg.data.copy()
+                to_send.pop('dataset', None)
+                to_send.pop('collection', None)
                 to_send['uri'] = ('ssh://%s/%s' % (SERVERNAME, result_file))
                 to_send['uid'] = filename
                 to_send['sensor'] = scene.get('instrument', None)
@@ -490,9 +492,11 @@ def ready2run(msg, files4pps, job_register, sceneid):
     if sceneid not in files4pps:
         files4pps[sceneid] = []
 
+    LOG.debug("level1_files = %s", level1_files)
     if platform_name in SUPPORTED_EOS_SATELLITES:
         for item in level1_files:
             fname = os.path.basename(item)
+            LOG.debug("EOS level-1 file: %s", item)
             if (fname.startswith(GEOLOC_PREFIX[platform_name]) or
                     fname.startswith(DATA1KM_PREFIX[platform_name])):
                 files4pps[sceneid].append(item)
@@ -500,6 +504,8 @@ def ready2run(msg, files4pps, job_register, sceneid):
         for item in level1_files:
             fname = os.path.basename(item)
             files4pps[sceneid].append(fname)
+
+    LOG.debug("files4pps: %s", str(files4pps[sceneid]))
 
     if (platform_name in SUPPORTED_METOP_SATELLITES or
             platform_name in SUPPORTED_NOAA_SATELLITES):
@@ -706,7 +712,8 @@ def pps():
             t__ = threading.Thread(target=pps_worker, args=(sema, scene,
                                                             jobs_dict[
                                                                 keyname],
-                                                            publisher_q))
+                                                            publisher_q,
+                                                            msg))
             threads.append(t__)
             t__.start()
 

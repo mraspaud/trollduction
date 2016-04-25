@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2013, 2014, 2015
+# Copyright (c) 2013, 2014, 2015, 2016
 
 # Author(s):
 
@@ -164,7 +164,7 @@ def update_utcpole_and_leapsec_files():
         LOG.info("Data retrieved from url...")
 
         # I store the files with a timestamp attached, in order not to remove
-        # the existing files.  In case something gets wrong in the download, we
+        # the existing files. In case something gets wrong in the download, we
         # can handle this by not changing the sym-links below:
         newname = filename + '_' + timestamp
         outfile = os.path.join(ETC_DIR, newname)

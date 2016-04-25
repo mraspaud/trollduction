@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2015 Adam.Dybbroe
+# Copyright (c) 2015, 2016 Adam.Dybbroe
 
 # Author(s):
 
@@ -64,6 +64,7 @@ nhsf_prefix = OPTIONS.get('nhsf_prefix', None)
 nwp_outdir = OPTIONS.get('nwp_outdir', None)
 nwp_lsmz_filename = OPTIONS.get('nwp_static_surface', None)
 nwp_output_prefix = OPTIONS.get('nwp_output_prefix', None)
+nwp_req_filename = OPTIONS.get('pps_nwp_requirements', None)
 
 import threading
 
@@ -167,10 +168,54 @@ def update_nwp(starttime, nlengths):
             raise IOError("Failed adding topography and land-sea " +
                           "mask data to grib file")
         os.remove(tmp_file)
-        os.rename(tmpresult, result_file)
+
+        if check_nwp_content(tmpresult):
+            LOG.info('A check of the NWP file content has been attempted: %s',
+                     result_file)
+            os.rename(tmpresult, result_file)
+        else:
+            LOG.warning("Missing important fields. No nwp file %s written to disk",
+                        result_file)
 
     return
 
+
+def check_nwp_content(gribfile):
+    """Check the content of the NWP file. If all fields required for PPS is
+    available, then return True
+
+    """
+    import pygrib
+
+    grbs = pygrib.open(gribfile)
+    entries = []
+    for grb in grbs:
+        entries.append("%s %s %s %s" % (grb['paramId'],
+                                        grb['name'],
+                                        grb['level'],
+                                        grb['typeOfLevel']))
+    entries.sort()
+
+    try:
+        with open(nwp_req_filename, 'r') as fpt:
+            lines = fpt.readlines()
+    except IOError:
+        LOG.exception(
+            "Failed reading nwp-requirements file: %s", nwp_req_filename)
+        LOG.warning("Cannot check if NWP files is ok!")
+        return True
+
+    srplines = [ll.strip('M ').strip('\n')
+                for ll in lines if str(ll).startswith('M')]
+
+    file_ok = True
+    for item in srplines:
+        if not item in entries:
+            LOG.warning("Mandatory field missing in NWP file: %s", str(item))
+            file_ok = False
+
+    LOG.info("NWP file has all required fields for PPS: %s", gribfile)
+    return file_ok
 
 if __name__ == "__main__":
 

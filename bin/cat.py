@@ -28,7 +28,7 @@
 import argparse
 import logging
 import logging.config
-from ConfigParser import RawConfigParser
+from ConfigParser import RawConfigParser, NoOptionError
 from trollsift.parser import compose
 from subprocess import Popen, PIPE
 import threading
@@ -38,7 +38,7 @@ from posttroll.subscriber import Subscribe
 from posttroll.message import Message
 import tempfile
 from bz2 import BZ2File
-from datetime import datetime
+from datetime import datetime, timedelta
 
 LOG = logging.getLogger(__name__)
 
@@ -137,6 +137,16 @@ def process_message(msg, config):
         if key in data:
             data[key] = aliases[key].get(data[key], data[key])
 
+    try:
+        min_length = int(config.get('min_length'))
+    except NoOptionError:
+        min_length = 0
+    if data["end_time"] - data["start_time"] < timedelta(minutes=min_length):
+        LOG.info('Pass too short, skipping: %s to %s', str(data["start_time"]), str(data["end_time"]))
+        return
+
+
+
     output_file = compose(pattern, data)
 
     with bunzipped(input_files) as files_to_read:
@@ -200,6 +210,8 @@ if __name__ == '__main__':
                         continue
                     if msg.type == "collection":
                         new_msg = str(process_message(msg, config))
+                        if new_msg is None:
+                            continue
                         LOG.info("Sending %s", new_msg)
                         pub.send(new_msg)
     except KeyboardInterrupt:

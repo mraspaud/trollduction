@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2013, 2014, 2015
+# Copyright (c) 2013, 2014, 2015, 2016
 
 # Author(s):
 
@@ -317,22 +317,24 @@ def get_sdr_times(filename):
     return start_time, end_time
 
 
-def publish_sdr(publisher, result_files, orbit):
+def publish_sdr(publisher, result_files, mda, **kwargs):
     """Publish the messages that SDR files are ready
     """
     if not result_files:
         return
+
     # Now publish:
-    to_send = {}
+    to_send = mda.copy()
+    if 'orbit' in kwargs:
+        to_send["orig_orbit_number"] = to_send["orbit_number"]
+        to_send["orbit_number"] = kwargs['orbit']
+
     to_send["dataset"] = []
     for result_file in result_files:
         filename = os.path.basename(result_file)
         to_send['dataset'].append({'uri': urlunsplit(('ssh', socket.gethostname(),
                                                       result_file, '', '')),
                                    'uid': filename})
-    to_send['sensor'] = 'viirs'
-    to_send['orbit_number'] = orbit
-    to_send['platform_name'] = 'Suomi-NPP'
     to_send['format'] = 'SDR'
     to_send['type'] = 'HDF5'
     to_send['data_processing_level'] = '1B'
@@ -414,6 +416,7 @@ class ViirsSdrProcessor(object):
         self.pass_start_time = None
         self.result_files = []
         self.sdr_home = OPTIONS['level1_home']
+        self.message_data = None
 
     def initialise(self):
         """Initialise the processor"""
@@ -466,6 +469,7 @@ class ViirsSdrProcessor(object):
         LOG.info("Sat and Instrument: " + str(msg.data['platform_name'])
                  + " " + str(msg.data['sensor']))
 
+        self.message_data = msg.data
         start_time = msg.data['start_time']
         try:
             end_time = msg.data['end_time']
@@ -599,6 +603,8 @@ def npp_rolling_runner():
                     if not status:
                         break  # end the loop and reinitialize !
 
+                LOG.debug(
+                    "Received message data = %s", str(viirs_proc.message_data))
                 tobj = viirs_proc.pass_start_time
                 LOG.info("Time used in sub-dir name: " +
                          str(tobj.strftime("%Y-%m-%d %H:%M")))
@@ -615,7 +621,8 @@ def npp_rolling_runner():
                     LOG.info("Cleaning up directory %s" % working_dir)
                     cleanup_cspp_workdir(working_dir)
                     publish_sdr(publisher, sdr_files,
-                                viirs_proc.orbit_number)
+                                viirs_proc.message_data,
+                                orbit=viirs_proc.orbit_number)
 
                 make_okay_files(viirs_proc.sdr_home, subd)
 

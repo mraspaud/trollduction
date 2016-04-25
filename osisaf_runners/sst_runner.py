@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2015 Adam.Dybbroe
+# Copyright (c) 2014, 2015, 2016 Adam.Dybbroe
 
 # Author(s):
 
@@ -24,6 +24,7 @@
 """
 import os
 import ConfigParser
+import shutil
 
 import logging
 LOG = logging.getLogger(__name__)
@@ -42,6 +43,15 @@ for option, value in CONF.items(MODE, raw=True):
     OPTIONS[option] = value
 
 SST_OUTPUT_DIR = OPTIONS['sst_outdir']
+try:
+    SST_OLD_OUTPUT_DIR = OPTIONS['sst_old_outdir']
+    SST_SIR_DIR = OPTIONS['sir_dir']
+    SST_SIR_LOCALDIR = OPTIONS['sir_local_dir']
+except KeyError:
+    SST_OLD_OUTPUT_DIR = None
+    SST_SIR_DIR = None
+    SST_SIR_LOCALDIR = None
+
 
 #: Default time format
 _DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
@@ -142,8 +152,10 @@ def start_sst_processing(sst_file, message, **kwargs):
 
     LOG.info("Sat and Instrument: " + platform_name + " " + instrument)
 
-    prfx = platform_name.lower() + start_time.strftime("_%Y%m%d_%H")
-    outname = os.path.join(SST_OUTPUT_DIR, 'osisaf_sst_%s.tif' % prfx)
+    areaid = 'euron1'
+    prfx = platform_name.lower() + start_time.strftime("_%Y%m%d_%H") + \
+        '_' + str(areaid)
+    outname = os.path.join(SST_OUTPUT_DIR, 'osisaf_sst_float_%s.tif' % prfx)
     LOG.info("Output file name: " + str(outname))
     if os.path.exists(outname):
         LOG.warning("File " + str(outname) + " already there. Continue...")
@@ -154,17 +166,65 @@ def start_sst_processing(sst_file, message, **kwargs):
     tslot = start_time
     glbd = PolarFactory.create_scene(
         platform_name, "", INSTRUMENT_NAME.get(instrument, instrument),
-        tslot, orbit)
+        tslot, orbit, variant="DR")
 
     LOG.debug("Load sst data...")
     glbd.load(['SST'], time_interval=(start_time, endtime))
 
     LOG.debug("Project data...")
-    localdata = glbd.project('baws')
-    img = localdata.image.sst_with_overlay()
-    img.save(outname)
+    localdata = glbd.project(areaid)
+    img = localdata.image.sst_float()
+    img.save(outname, floating_point=True)
+    LOG.debug("SST Tiff file stored on area %s", str(areaid))
 
-    LOG.debug("SST Tiff file stored!")
+    # Store some other products for Diana and other users:
+    # We should rather use producer.py and the XML product list!
+    # FIXME!
+    # if SST_OLD_OUTPUT_DIR:
+    #     prfx = start_time.strftime("%Y%m%d%H%M")
+    #     outname = os.path.join(
+    #         SST_OLD_OUTPUT_DIR, 'noaa_osisaf_sstbaltic_%s.png' % prfx)
+    #     LOG.info("Output file name: " + str(outname))
+    #     img = localdata.image.sst_with_landseamask()
+    #     img.save(outname)
+    #     LOG.debug("SST PNG file stored on area %s", str(areaid))
+
+    if SST_SIR_LOCALDIR and SST_SIR_DIR:
+        img = localdata.image.sst_with_landseamask()
+        areaid_str = '{s:{c}<{n}}'.format(s=areaid, n=8, c='_')
+        local_filename = os.path.join(SST_SIR_LOCALDIR,
+                                      "osafsst_%s%s.png" % (areaid_str,
+                                                            start_time.strftime('%y%m%d%H%M')))
+        img.save(local_filename)
+        sir_filename = os.path.join(SST_SIR_DIR,
+                                    "osafsst_%s%s.png_original" % (areaid_str,
+                                                                   start_time.strftime('%y%m%d%H%M')))
+        shutil.copy(local_filename, sir_filename)
+
+    prfx = platform_name.lower() + start_time.strftime("_%Y%m%d_%H") + \
+        '_' + str(areaid)
+    outname = os.path.join(SST_OUTPUT_DIR, 'osisaf_sst_%s.tif' % prfx)
+    LOG.info("Output file name: " + str(outname))
+    LOG.debug("Project data...")
+    localdata = glbd.project(areaid)
+    img = localdata.image.sst()
+    img.save(outname)
+    LOG.debug("SST Tiff file stored on area %s!", str(areaid))
+
+    if SST_SIR_LOCALDIR and SST_SIR_DIR:
+        areaid = 'baws'
+        localdata = glbd.project(areaid)
+        img = localdata.image.sst_with_landseamask()
+        areaid_str = '{s:{c}<{n}}'.format(s=areaid, n=8, c='_')
+        local_filename = os.path.join(SST_SIR_LOCALDIR,
+                                      "osafsst_%s%s.png" % (areaid_str,
+                                                            start_time.strftime('%y%m%d%H%M')))
+        img.save(local_filename)
+        sir_filename = os.path.join(SST_SIR_DIR,
+                                    "osafsst_%s%s.png_original" % (areaid_str,
+                                                                   start_time.strftime('%y%m%d%H%M')))
+        shutil.copy(local_filename, sir_filename)
+
     return sst_file
 
 

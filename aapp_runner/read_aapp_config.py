@@ -30,6 +30,7 @@ valid_config_variables = [
     'servername',
     'dataserver',
     'locktime_before_rerun',
+    'passlength_threshold'
 ]
 
 #

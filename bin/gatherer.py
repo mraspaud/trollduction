@@ -48,8 +48,6 @@ def get_metadata(fname):
 
     res = None
     for section in CONFIG.sections():
-        if section == "default":
-            continue
         try:
             parser = Parser(CONFIG.get(section, "pattern"))
         except NoOptionError:
@@ -59,7 +57,7 @@ def get_metadata(fname):
         res = parser.parse(fname)
         res.update(dict(CONFIG.items(section)))
 
-        for key in ["watcher", "pattern", "timeliness"]:
+        for key in ["watcher", "pattern", "timeliness", "regions"]:
             res.pop(key, None)
 
         if "duration" in res and "end_time" not in res:
@@ -110,11 +108,11 @@ def terminator(metadata, publish_topic=None):
     mda['collection_area_id'] = sorted_mda[-1]['collection_area_id']
     mda['collection'] = []
 
-    has_uri = False
+    is_correct = False
     for meta in sorted_mda:
         new_mda = {}
-        if "uri" in meta:
-            has_uri = True
+        if "uri" in meta or 'dataset' in meta:
+            is_correct = True
         for key in ['dataset', 'uri', 'uid']:
             if key in meta:
                 new_mda[key] = meta[key]
@@ -126,13 +124,13 @@ def terminator(metadata, publish_topic=None):
         if key in mda:
             del mda[key]
 
-    if has_uri:
+    if is_correct:
         msg = message.Message(subject, "collection",
                               mda)
         LOGGER.info("sending %s", str(msg))
         PUB.send(str(msg))
     else:
-        LOGGER.debug("Malformed metadata, no key: %s", "uri")
+        LOGGER.warning("Malformed metadata, no key: %s", "uri")
 
 
 def arg_parse():
@@ -154,23 +152,23 @@ def arg_parse():
     return parser.parse_args()
 
 
-def setup(regions, decoder):
+def setup(decoder):
     """Setup the granule triggerer.
     """
 
     granule_triggers = []
 
     for section in CONFIG.sections():
-        if section == "default":
-            continue
+        regions = [get_area_def(region)
+                   for region in CONFIG.get(section, "regions").split()]
 
         timeliness = timedelta(minutes=CONFIG.getint(section, "timeliness"))
         try:
             duration = timedelta(seconds=CONFIG.getfloat(section, "duration"))
         except NoOptionError:
             duration = None
-        collectors = [region_collector.RegionCollector(
-            region, timeliness, duration) for region in regions]
+        collectors = [region_collector.RegionCollector(region, timeliness, duration)
+                      for region in regions]
 
         try:
             observer_class = CONFIG.get(section, "watcher")
@@ -245,14 +243,13 @@ def main():
     LOGGER = logging.getLogger("gatherer")
 
     if opts.config_item:
-        config_items = opts.config_item + ["default"]
-        for section in config_items:
+        for section in opts.config_item:
             if section not in CONFIG.sections():
                 LOGGER.warning("No config item called %s found in config file.", section)
         for section in CONFIG.sections():
-            if section not in config_items:
+            if section not in opts.config_item:
                 CONFIG.remove_section(section)
-        if len(CONFIG.sections()) == 1:
+        if len(CONFIG.sections()) == 0:
             LOGGER.error("No valid config item provided")
             return
 
@@ -260,12 +257,7 @@ def main():
 
     PUB = publisher.NoisyPublisher("gatherer")
 
-    # TODO: get this from the product config files
-    # NOTE: the product configs might not be locally available
-    regions = [get_area_def(region)
-               for region in CONFIG.get("default", "regions").split()]
-
-    granule_triggers = setup(regions, decoder)
+    granule_triggers = setup(decoder)
 
     PUB.start()
 

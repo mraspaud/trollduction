@@ -37,6 +37,7 @@ from trollsift import Parser
 from ConfigParser import ConfigParser
 import logging
 import logging.config
+import os
 import os.path
 import datetime as dt
 from collections import deque
@@ -158,8 +159,10 @@ class EventHandler(ProcessEvent):
 
             # replace values with corresponding aliases, if any are given
             if self.aliases:
-                for key in self.info:
+                info = self.info.copy()
+                for key in info:
                     if key in self.aliases:
+                        self.info['orig_'+key] = self.info[key]
                         self.info[key] = self.aliases[key][str(self.info[key])]
 
             # add start_time and end_time if not present
@@ -238,6 +241,10 @@ def create_notifier(topic, instrument, posttroll_port, filepattern,
 
 def main():
     '''Main(). Commandline parsing and stalker startup.'''
+
+    print "Setting timezone to UTC"
+    os.environ["TZ"] = "UTC"
+    time.tzset()
 
     parser = argparse.ArgumentParser()
 

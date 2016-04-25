@@ -53,9 +53,9 @@ class TestPostTrollTrigger(unittest.TestCase):
                                publish_topic=None)
 
         sub = ptt.msgproc.nssub.start.return_value
-        sub.recv.return_value = iter([FakeMessage("a"),
-                                      FakeMessage("b"),
-                                      FakeMessage("c")])
+        sub.recv.return_value = iter([FakeMessage({"a": "a"}),
+                                      FakeMessage({"b": "b"}),
+                                      FakeMessage({"c": "c"})])
 
         ptt.start()
         time.sleep(.4)

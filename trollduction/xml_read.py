@@ -148,8 +148,12 @@ class ProductList(object):
                                                **group.attrib))
             elif item.tag == "variables":
                 if item.attrib:
-                    res = [os.environ[env] != val
-                           for env, val in item.attrib.items()]
+                    try:
+                        res = [os.environ[env] != val
+                               for env, val in item.attrib.items()]
+                    except KeyError:
+                        LOGGER.warning("Environment variable %s not defined, skipping section in xml file", env)
+                        continue
                     if any(res):
                         continue
                 for var in item:

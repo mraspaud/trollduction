@@ -1,40 +1,81 @@
+[DEFAULT]
+
+
+# subscribe_topics = /EARS/0
+subscribe_topics = /HRPT/0,/EPS/0
+publish_pps_format = AAPP-HRPT
+# publish_l1_format = 
+# publish_l1_format = AAPP-EARS
+publish_l1_format = AAPP-PREOPER
+#aapp_prefix = /local_disk/opt/aapp
+aapp_prefix = /home/users/satman/AAPP_7.9_runtime
+#aapp_workdir = /san1/aapp/work
+aapp_workdir = /home/users/satman/tmp
+#aapp_run_noaa_script = /local_disk/opt/aapp/smhi/AAPP_RUN_NOAA_WITH_ANA
+#aapp_run_metop_script = /local_disk/opt/aapp/smhi/AAPP_RUN_METOP_SMHI
+aapp_run_noaa_script = /home/users/satman/current/config_files/AAPP_RUN_NOAA
+aapp_run_metop_script = /home/users/satman/current/config_files/AAPP_RUN_METOP
+
+tle_script = /local_disk/opt/aapp/AAPP/bin/tleing
+tle_indir = /san1/polar_in/tle
+tle_outdir = /local_disk/opt/aapp/AAPP/orbelems/tle_db
+alleph_script = /local_disk/opt/aapp/AAPP/bin/alleph 
+
+# Number of minutes before a new processing can be done on the same scene:
+locktime_before_rerun = 15
+# Thus if a message is received, before locktime_before_rerun minutes has
+# passed, with a new pass for the same satellite, but with overlapping times,
+# no aapp-processing will be launched on the scene. This prevents duplicate
+# scenes if there are more antennas (trollcast) receiving the same scene or if
+# there is both direct readout and ears active.
+
+pps_satpos_ephe_dir = /san1/pps/import/ANC_data/source
+# aapp_out_dir = /san1/pps/import/PPS_data/source
+# metop_lvl0_dir = /san1/polar_in/direct_readout/metop
+tle_per_satellite = 'tle tle tle tle tle'
+satellites_to_schedule = ['noaa19', 'noaa18', 'noaa15', 'metop02', 'metop01']
+supported_noaa_satellites = noaa19 noaa18 noaa15
+supported_metop_satellites = metop01 metop02
+
+# The minimum allowed pass length. All shorter passes will be ignored:
+passlength_threshold = 4
+
+# use dynamic working dir in AAPP processing. Original AAPP_RUN_NOAA needs to
+# be modificated for this.
+use_dyn_work_dir = TRUE
+
+
+# at least one output directory must be defined from below
+# optional
+pps_out_dir = /lustre/tmp/data/oper/safnwc_test/pps/data/import/PPS_data/source
+#pps_out_dir = /san1/pps/import/PPS_data/source
+
+# optional
+# data will be here under directories leve1b, level1c and level1d
+metop_data_out_dir = /lustre/tmp/data/oper/metop_test
+noaa_data_out_dir = /lustre/tmp/data/oper/hrpt_test2
+#metop_data_out_dir = 
+#noaa_data_out_dir = 
+
+# optional
+# directory to put aapp processing log files
+#aapp_log_files_dir = /san1/AAPP_logs
+aapp_log_files_dir = /home/users/satman/current/log_files/
+# How many days log files are archieved
+aapp_log_files_backup = 1
+
+
+# sat-polar-test
+dataserver =
+
+
 [logging]
 log_rotation_days = 1
 log_rotation_backup = 30
 logging_mode = DEBUG
 
 [preoper]
-# subscribe_topics = /EARS/0
-subscribe_topics = /HRPT/0,/EPS/0
-# publish format
-publish_pps_format = AAPP-PPS
-#publish_pps_format =
 
-# publish_l1_format = AAPP-EARS
-publish_l1_format = AAPP-PREOPER
-#publish_l1_format = 
-aapp_prefix = /home/users/satman/AAPP_7.9_runtime
-aapp_workdir = /home/users/satman/tmp
-aapp_run_noaa_script = /home/users/satman/current/config_files/AAPP_RUN_NOAA
-aapp_run_metop_script = /home/users/satman/current/config_files/AAPP_RUN_METOP
-#aapp_run_metop_script =
-# use dynamic working dir in AAPP processing. Original AAPP_RUN_NOAA needs to be modificated for this. 
-use_dyn_work_dir = TRUE
-# at least one output directory must be defined from below
-# optional
-pps_out_dir = /lustre/tmp/data/oper/safnwc_test/pps/data/import/PPS_data/source
-#pps_out_dir =
-# optional
-# data will be here under directories leve1b, level1c and level1d
-metop_data_out_dir = /lustre/tmp/data/oper/metop_test
-noaa_data_out_dir = /lustre/tmp/data/oper/hrpt_test2
-#metop_data_out_dir =
-#noaa_data_out_dir = 
-# optional
-# directory to put aapp processing log files
-aapp_log_files_dir = /home/users/satman/current/log_files/
-# How many days log files are archieved
-aapp_log_files_backup = 1
 # required
 #servername = sat-polar-test.fmi.fi
 servername = sat-polar-aapp.fmi.fi
@@ -57,5 +98,4 @@ dataserver = 193.166.211.183
 #aapp_stat_file = /home/users/satman/aapp_run_env/statistics/aapp_statistics.log
 
 #metop_lvl0_dir=/lustre/tmp/data/oper/metop/level0
-
 

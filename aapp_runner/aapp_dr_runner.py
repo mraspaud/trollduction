@@ -1,12 +1,13 @@
 #!/home/users/satman/current/bin/python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2015 Adam.Dybbroe
+# Copyright (c) 2014, 2015, 2016 Adam.Dybbroe
 
 # Author(s):
 
-#   Adam.Dybbroe <a000680@c14526.ad.smhi.se>
+#   Adam.Dybbroe <adam.dybbroe@smhi.se>
 #   Janne Kotro fmi.fi
+
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -169,6 +170,8 @@ class AappLvl1Processor(object):
         self.environment = runner_config['environment']
         self.locktime_before_rerun = int(
             runner_config.get('locktime_before_rerun', 10))
+        self.passlength_threshold = int(runner_config['passlength_threshold'])
+
         self.fullswath = True  # Always a full swath (never HRPT granules)
         self.ishmf = False
         self.working_dir = None
@@ -425,11 +428,11 @@ class AappLvl1Processor(object):
             LOG.debug("\tMessage:")
             LOG.debug(str(msg))
             urlobj = urlparse(msg.data['uri'])
-            server = urlobj.netloc
             url_ip = socket.gethostbyname(urlobj.netloc)
             if urlobj.netloc and (url_ip not in get_local_ips()):
-                LOG.warning("Server %s not the current one: %s" % (str(urlobj.netloc),
-                                                                   socket.gethostname()))
+                LOG.warning("Server %s not the current one: %s",
+                            str(urlobj.netloc),
+                            socket.gethostname())
                 return True
 
             LOG.info("Ok... " + str(urlobj.netloc))
@@ -445,6 +448,13 @@ class AappLvl1Processor(object):
                     "No end_time in message! Guessing start_time + 14 minutes...")
                 self.endtime = msg.data[
                     'start_time'] + timedelta(seconds=60 * 14)
+
+            # Test if the scene is longer than minimum required:
+            pass_length = self.endtime - self.starttime
+            if pass_length < timedelta(seconds=60 * self.passlength_threshold):
+                LOG.info("Pass is too short: Length in minutes = %6.1f",
+                         pass_length.seconds / 60.0)
+                return True
 
             start_orbnum = None
             try:
@@ -558,14 +568,13 @@ class AappLvl1Processor(object):
             if fname.find('.hmf') > 0:
                 self.ishmf = True
             else:
-                LOG.info("File is not a hmf file, " +
-                         "probably a Metop file or a NOAA from DMI: " + str(fname))
+                LOG.info("File is not a hmf file: " + str(fname))
 
             LOG.debug("Sensor = " + str(msg.data['sensor']))
             LOG.debug("type: " + str(type(msg.data['sensor'])))
-            if type(msg.data['sensor']) in [str, unicode]:
+            if isinstance(msg.data['sensor'], (str, unicode)):
                 sensors = [msg.data['sensor']]
-            elif type(msg.data['sensor']) is list:
+            elif isinstance(msg.data['sensor'], (list, set, tuple)):
                 sensors = msg.data['sensor']
             else:
                 sensors = []
@@ -861,10 +870,10 @@ def aapp_rolling_runner(runner_config):
                                    aapp_proc.environment,
                                    aapp_proc.publish_pps_format,
                                    level1_files,
-                                   aapp_proc.platform_name,
                                    aapp_proc.orbit,
                                    aapp_proc.starttime,
-                                   aapp_proc.endtime)
+                                   aapp_proc.endtime,
+                                   msg.data)
 
                 elif (aapp_proc.station == 'helsinki' or
                         aapp_proc.station == 'kumpula'):
@@ -898,10 +907,10 @@ def aapp_rolling_runner(runner_config):
                                            aapp_proc.environment,
                                            aapp_proc.publish_pps_format,
                                            level1_files,
-                                           aapp_proc.platform_name,
                                            aapp_proc.orbit,
                                            aapp_proc.starttime,
-                                           aapp_proc.endtime)
+                                           aapp_proc.endtime,
+                                           msg.data)
                         else:
                             LOG.error("No files copied to " + subd)
 
@@ -921,10 +930,10 @@ def aapp_rolling_runner(runner_config):
                                            aapp_proc.environment,
                                            aapp_proc.publish_l1_format,
                                            level1_files,
-                                           aapp_proc.platform_name,
                                            aapp_proc.orbit,
                                            aapp_proc.starttime,
-                                           aapp_proc.endtime)
+                                           aapp_proc.endtime,
+                                           msg.data)
                         else:
                             LOG.error("Nofile copied to " + data_out_dir)
 
@@ -959,7 +968,7 @@ def publish_level1(publisher,
                    station,
                    publish_format,
                    result_files,
-                   satellite, orbit, start_t, end_t):
+                   orbit, start_t, end_t, mda):
     """Publish the messages that AAPP lvl1 files are ready
     """
     # Now publish:
@@ -967,13 +976,11 @@ def publish_level1(publisher,
         resultfile = key
         LOG.debug("File: " + str(os.path.basename(resultfile)))
         filename = os.path.split(resultfile)[1]
-        to_send = {}
+        to_send = mda.copy()
         to_send['uri'] = ('ssh://%s%s' % (server, resultfile))
         to_send['uid'] = filename
         to_send['sensor'] = result_files[key]['sensor']
-        to_send['platform_name'] = satellite
         to_send['orbit_number'] = int(orbit)
-#        to_send['format'] = 'AAPP-HRPT'
         to_send['format'] = publish_format
         to_send['type'] = 'Binary'
         to_send['data_processing_level'] = result_files[key]['level']

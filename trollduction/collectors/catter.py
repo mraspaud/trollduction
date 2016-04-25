@@ -26,10 +26,10 @@
 from posttroll.subscriber import Subscribe
 from posttroll.publisher import Publish
 from posttroll.message import Message
-from ConfigParser import RawConfigParser
+from ConfigParser import RawConfigParser, NoOptionError
 import logging
 from trollsift import compose
-from datetime import datetime
+from datetime import datetime, timedelta
 import bz2
 import os.path
 
@@ -93,6 +93,13 @@ if __name__ == '__main__':
                     pattern = config.get(section, "pattern")
                     mda["proc_time"] = datetime.utcnow()
                     mda["end_time"] = msg.data[-1]["end_time"]
+                    try:
+                        min_length = config.getint(section, 'min_length')
+                    except NoOptionError:
+                        min_length = 0
+                    if mda["end_time"] - mda["start_time"] < timedelta(minutes=min_length):
+                        logger.info('Pass too short, skipping: %s to %s', str(mda["start_time"]), str(mda["end_time"]))
+                        continue
                     fname = compose(pattern, mda)
                     mda["uri"] = fname
                     mda["filename"] = os.path.basename(fname)

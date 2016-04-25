@@ -10,7 +10,7 @@ Provide a gatherer configuration file.
 
 .. code-block:: ini
 
- [default]
+ [DEFAULT]
  regions=euron1 afghanistan afhorn
 
  [local_viirs]

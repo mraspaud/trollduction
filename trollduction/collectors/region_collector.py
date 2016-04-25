@@ -93,12 +93,22 @@ class RegionCollector(object):
                              str(self.region.area_id))
                     return self.finish()
                 else:
-                    new_timeout = (max(set(self.planned_granule_times) - set(self.granule_times)) +
-                                   self.granule_duration +
-                                   self.timeliness)
+                    try:
+                        new_timeout = (max(self.planned_granule_times -
+                                           self.granule_times) +
+                                       self.granule_duration +
+                                       self.timeliness)
+                    except ValueError:
+                        LOG.error("Calculation of new timeout failed, "
+                                  "keeping previous timeout.")
+                        LOG.error("Planned: %s", self.planned_granule_times)
+                        LOG.error("Received: %s", self.granule_times)
+                        return
+
                     if new_timeout < self.timeout:
                         self.timeout = new_timeout
-                        LOG.info("Adjusted timeout: %s", self.timeout.isoformat())
+                        LOG.info("Adjusted timeout: %s",
+                                 self.timeout.isoformat())
 
                     return
 
@@ -181,16 +191,18 @@ class RegionCollector(object):
     def is_swath_complete(self):
         '''Check if the swath is complete'''
         if self.granule_times:
-            if self.granule_times == self.planned_granule_times:
+            if self.planned_granule_times.issubset(self.granule_times):
                 return True
             try:
-                new_timeout = (max(set(self.planned_granule_times) -
-                                   set(self.granule_times)) +
+                new_timeout = (max(self.planned_granule_times -
+                                   self.granule_times) +
                                self.granule_duration +
                                self.timeliness)
             except ValueError:
                 LOG.error("Calculation of new timeout failed, "
                           "keeping previous timeout.")
+                LOG.error("Planned: %s", self.planned_granule_times)
+                LOG.error("Received: %s", self.granule_times)
                 return False
             if new_timeout < self.timeout:
                 self.timeout = new_timeout
