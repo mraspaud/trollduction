@@ -47,8 +47,10 @@ class SegmentGatherer(object):
         self._config = config
         self._section = section
         topics = config.get(section, 'topics').split()
+        nameservers = config.get(section, 'nameservers').split()
         self._listener = ListenerContainer(topics=topics)
-        self._publisher = publisher.NoisyPublisher("segment_gatherer")
+        self._publisher = publisher.NoisyPublisher("segment_gatherer",
+                                                   nameservers=nameservers)
         self._subject = config.get(section, "publish_topic")
         self._pattern = config.get(section, 'pattern')
         self._parser = Parser(self._pattern)
