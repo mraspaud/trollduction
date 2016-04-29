@@ -434,6 +434,10 @@ class DataProcessor(object):
         time_slot = (mda.get('start_time') or
                      mda.get('nominal_time') or
                      mda.get('end_time'))
+        
+        scene_time_slot = time_slot
+        if 'end_time' in mda:
+            scene_time_slot = (scene_time_slot, mda['end_time'])
 
         # orbit is not given for GEO satellites, use None
 
@@ -454,7 +458,7 @@ class DataProcessor(object):
         global_data = GF.create_scene(satname=str(platform),
                                       satnumber='',
                                       instrument=str(sensor),
-                                      time_slot=time_slot,
+                                      time_slot=scene_time_slot,
                                       orbit=mda['orbit_number'],
                                       variant=mda.get('variant', ''))
         LOGGER.debug("Creating scene for satellite %s and time %s",

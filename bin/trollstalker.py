@@ -52,10 +52,13 @@ class EventHandler(ProcessEvent):
      *topic* - topic of the published messages
      *posttroll_port* - port number to publish the messages on
      *filepattern* - filepattern for finding information from the filename
+     *start_time_offset* - start_time = time + start_time_offset (minutes)
+     *end_time_offset* - end_time = time + end_time_offset (minutes)
     """
 
     def __init__(self, topic, instrument, posttroll_port=0, filepattern=None,
-                 aliases=None, tbus_orbit=False, history=0, nameservers=[]):
+                 aliases=None, tbus_orbit=False, history=0, nameservers=[],
+                 start_time_offset=0, end_time_offset=1):
         super(EventHandler, self).__init__()
 
         self._pub = NoisyPublisher("trollstalker", posttroll_port, topic, nameservers=nameservers)
@@ -69,6 +72,8 @@ class EventHandler(ProcessEvent):
         self.aliases = aliases
         self.tbus_orbit = tbus_orbit
         self._deque = deque([], history)
+        self.start_time_offset = start_time_offset
+        self.end_time_offset = end_time_offset
 
     def stop(self):
         '''Stop publisher.
@@ -174,7 +179,8 @@ class EventHandler(ProcessEvent):
                 except KeyError:
                     base_time = self.info["start_time"]
             if "start_time" not in self.info:
-                self.info["start_time"] = base_time
+                self.info["start_time"] = \
+                    base_time + dt.timedelta(minutes=self.start_time_offset)
             if "start_date" in self.info:
                 self.info["start_time"] = \
                     dt.datetime.combine(self.info["start_date"].date(),
@@ -188,7 +194,8 @@ class EventHandler(ProcessEvent):
                                         self.info["end_time"].time())
                 del self.info["end_date"]
             if "end_time" not in self.info:
-                self.info["end_time"] = base_time + dt.timedelta(minutes=1)
+                self.info["end_time"] = \
+                    base_time + dt.timedelta(minutes=self.end_time_offset)
 
             while self.info["start_time"] > self.info["end_time"]:
                 self.info["end_time"] += dt.timedelta(days=1)
@@ -206,7 +213,8 @@ class NewThreadedNotifier(ThreadedNotifier):
 
 def create_notifier(topic, instrument, posttroll_port, filepattern,
                     event_names, monitored_dirs, aliases=None,
-                    tbus_orbit=False, history=0, nameservers=[]):
+                    tbus_orbit=False, history=0, nameservers=[],
+                    start_time_offset=0, end_time_offset=1):
     '''Create new notifier'''
 
     # Event handler observes the operations in defined folder
@@ -228,7 +236,9 @@ def create_notifier(topic, instrument, posttroll_port, filepattern,
                                  aliases=aliases,
                                  tbus_orbit=tbus_orbit,
                                  history=history,
-                                 nameservers=nameservers)
+                                 nameservers=nameservers,
+                                 start_time_offset=start_time_offset,
+                                 end_time_offset=end_time_offset)
 
     notifier = NewThreadedNotifier(manager, event_handler)
 
@@ -346,6 +356,16 @@ def main():
 
         nameservers = nameservers or config['nameservers']
 
+        try:
+            start_time_offset = int(config['start_time_offset'])
+        except KeyError:
+            start_time_offset = 0
+
+        try:
+            end_time_offset = int(config['end_time_offset'])
+        except KeyError:
+            end_time_offset = 0
+
         aliases = helper_functions.parse_aliases(config)
         tbus_orbit = bool(config.get("tbus_orbit", False))
 
@@ -386,7 +406,9 @@ def main():
     notifier = create_notifier(topic, instrument, posttroll_port, filepattern,
                                event_names, monitored_dirs, aliases=aliases,
                                tbus_orbit=tbus_orbit, history=history,
-                               nameservers=nameservers)
+                               nameservers=nameservers,
+                               start_time_offset=start_time_offset,
+                               end_time_offset=end_time_offset)
     notifier.start()
 
     try:
