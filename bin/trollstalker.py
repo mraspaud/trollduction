@@ -32,6 +32,7 @@ import sys
 import time
 from posttroll.publisher import NoisyPublisher
 from posttroll.message import Message
+from trollduction import helper_functions
 from trollsift import Parser
 from ConfigParser import ConfigParser
 import logging
@@ -51,13 +52,16 @@ class EventHandler(ProcessEvent):
      *topic* - topic of the published messages
      *posttroll_port* - port number to publish the messages on
      *filepattern* - filepattern for finding information from the filename
+     *start_time_offset* - start_time = time + start_time_offset (minutes)
+     *end_time_offset* - end_time = time + end_time_offset (minutes)
     """
 
     def __init__(self, topic, instrument, posttroll_port=0, filepattern=None,
-                 aliases=None, tbus_orbit=False, history=0):
+                 aliases=None, tbus_orbit=False, history=0, nameservers=[],
+                 start_time_offset=0, end_time_offset=1):
         super(EventHandler, self).__init__()
 
-        self._pub = NoisyPublisher("trollstalker", posttroll_port, topic)
+        self._pub = NoisyPublisher("trollstalker", posttroll_port, topic, nameservers=nameservers)
         self.pub = self._pub.start()
         self.topic = topic
         self.info = {}
@@ -68,6 +72,8 @@ class EventHandler(ProcessEvent):
         self.aliases = aliases
         self.tbus_orbit = tbus_orbit
         self._deque = deque([], history)
+        self.start_time_offset = start_time_offset
+        self.end_time_offset = end_time_offset
 
     def stop(self):
         '''Stop publisher.
@@ -173,7 +179,8 @@ class EventHandler(ProcessEvent):
                 except KeyError:
                     base_time = self.info["start_time"]
             if "start_time" not in self.info:
-                self.info["start_time"] = base_time
+                self.info["start_time"] = \
+                    base_time + dt.timedelta(minutes=self.start_time_offset)
             if "start_date" in self.info:
                 self.info["start_time"] = \
                     dt.datetime.combine(self.info["start_date"].date(),
@@ -187,10 +194,12 @@ class EventHandler(ProcessEvent):
                                         self.info["end_time"].time())
                 del self.info["end_date"]
             if "end_time" not in self.info:
-                self.info["end_time"] = base_time + dt.timedelta(minutes=1)
+                self.info["end_time"] = \
+                    base_time + dt.timedelta(minutes=self.end_time_offset)
 
             while self.info["start_time"] > self.info["end_time"]:
                 self.info["end_time"] += dt.timedelta(days=1)
+
 
 class NewThreadedNotifier(ThreadedNotifier):
 
@@ -204,7 +213,8 @@ class NewThreadedNotifier(ThreadedNotifier):
 
 def create_notifier(topic, instrument, posttroll_port, filepattern,
                     event_names, monitored_dirs, aliases=None,
-                    tbus_orbit=False, history=0):
+                    tbus_orbit=False, history=0, nameservers=[],
+                    start_time_offset=0, end_time_offset=1):
     '''Create new notifier'''
 
     # Event handler observes the operations in defined folder
@@ -225,7 +235,10 @@ def create_notifier(topic, instrument, posttroll_port, filepattern,
                                  filepattern=filepattern,
                                  aliases=aliases,
                                  tbus_orbit=tbus_orbit,
-                                 history=history)
+                                 history=history,
+                                 nameservers=nameservers,
+                                 start_time_offset=start_time_offset,
+                                 end_time_offset=end_time_offset)
 
     notifier = NewThreadedNotifier(manager, event_handler)
 
@@ -234,36 +247,6 @@ def create_notifier(topic, instrument, posttroll_port, filepattern,
         manager.add_watch(monitored_dir, event_mask, rec=True)
 
     return notifier
-
-
-def parse_aliases(config):
-    '''Parse aliases from the config.
-
-    Aliases are given in the config as:
-
-    {'alias_<name>': 'value:alias'}, or
-    {'alias_<name>': 'value1:alias1|value2:alias2'},
-
-    where <name> is the name of the key which value will be
-    replaced. The later form is there to support several possible
-    substitutions (eg. '2' -> '9' and '3' -> '10' in the case of MSG).
-
-    '''
-    aliases = {}
-
-    for key in config:
-        if 'alias' in key:
-            alias = config[key]
-            new_key = key.replace('alias_', '')
-            if '|' in alias or ':' in alias:
-                parts = alias.split('|')
-                aliases2 = {}
-                for part in parts:
-                    key2, val2 = part.split(':')
-                    aliases2[key2] = val2
-                alias = aliases2
-            aliases[new_key] = alias
-    return aliases
 
 
 def main():
@@ -304,6 +287,10 @@ def main():
     parser.add_argument("-i", "--instrument",
                         type=str, default=None,
                         help="Instrument name in the satellite")
+    parser.add_argument("-n", "--nameservers",
+                        type=str, default=None,
+                        help="Posttroll nameservers to register own address,"
+                        " otherwise multicasting is used")
 
     if len(sys.argv) <= 1:
         parser.print_help()
@@ -323,6 +310,7 @@ def main():
     topic = args.topic
     event_names = args.event_names
     instrument = args.instrument
+    nameservers = args.nameservers
 
     filepattern = args.filepattern
     if args.filepattern == '':
@@ -366,7 +354,19 @@ def main():
         except KeyError:
             history = 0
 
-        aliases = parse_aliases(config)
+        nameservers = nameservers or config['nameservers']
+
+        try:
+            start_time_offset = int(config['start_time_offset'])
+        except KeyError:
+            start_time_offset = 0
+
+        try:
+            end_time_offset = int(config['end_time_offset'])
+        except KeyError:
+            end_time_offset = 0
+
+        aliases = helper_functions.parse_aliases(config)
         tbus_orbit = bool(config.get("tbus_orbit", False))
 
         try:
@@ -397,10 +397,18 @@ def main():
     if type(monitored_dirs) is not list:
         monitored_dirs = [monitored_dirs]
 
+    if nameservers:
+        nameservers = nameservers.split(',')
+    else:
+        nameservers = []
+
     # Start watching for new files
     notifier = create_notifier(topic, instrument, posttroll_port, filepattern,
                                event_names, monitored_dirs, aliases=aliases,
-                               tbus_orbit=tbus_orbit, history=history)
+                               tbus_orbit=tbus_orbit, history=history,
+                               nameservers=nameservers,
+                               start_time_offset=start_time_offset,
+                               end_time_offset=end_time_offset)
     notifier.start()
 
     try:

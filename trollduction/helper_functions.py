@@ -304,3 +304,46 @@ def overlapping_timeinterval(start_end_times, timelist):
             return tstart, tend
 
     return False
+
+
+def parse_aliases(config):
+    '''Parse aliases from the config.
+
+    Aliases are given in the config as:
+
+    {'alias_<name>': 'value:alias'}, or
+    {'alias_<name>': 'value1:alias1|value2:alias2'},
+
+    where <name> is the name of the key which value will be
+    replaced. The later form is there to support several possible
+    substitutions (eg. '2' -> '9' and '3' -> '10' in the case of MSG).
+
+    '''
+    aliases = {}
+
+    for key in config:
+        if 'alias' in key:
+            alias = config[key]
+            new_key = key.replace('alias_', '')
+            if '|' in alias or ':' in alias:
+                parts = alias.split('|')
+                aliases2 = {}
+                for part in parts:
+                    key2, val2 = part.split(':')
+                    aliases2[key2] = val2
+                alias = aliases2
+            aliases[new_key] = alias
+    return aliases
+
+
+def eval_default(expression, default_res=None):
+    """Calls eval on expression and returns default_res if it throws
+    exceptions
+    """
+    if default_res is None:
+        default_res = expression
+    try:
+        return eval(expression)
+    except:
+        pass
+    return default_res
