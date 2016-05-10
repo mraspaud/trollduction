@@ -37,6 +37,11 @@ from posttroll import message, publisher
 from trollduction.listener import ListenerContainer
 from trollsift import Parser, compose
 
+SLOT_NOT_READY = 0
+SLOT_READY = 1
+SLOT_READY_BUT_WAIT_FOR_MORE = 2
+SLOT_OBSOLUTE_TIMEOUT = 3
+
 
 class SegmentGatherer(object):
 
@@ -60,6 +65,12 @@ class SegmentGatherer(object):
                                                                   "timeliness"))
         except (NoOptionError, ValueError):
             self._timeliness = dt.timedelta(seconds=1200)
+
+        try:
+            self._num_files_premature_publish = \
+                config.getint(section, "num_files_premature_publish")
+        except (NoOptionError, ValueError):
+            self._num_files_premature_publish = -1
 
         self.slots = OrderedDict()
 
@@ -114,6 +125,8 @@ class SegmentGatherer(object):
         self.slots[time_slot]['delayed_files'] = set([])
         self.slots[time_slot]['missing_files'] = set([])
         self.slots[time_slot]['timeout'] = None
+        self.slots[time_slot]['files_till_premature_publish'] = \
+            self._num_files_premature_publish
 
     def _compose_filenames(self, time_slot, itm_str):
         """Compose filename set()s based on a pattern and item string.
@@ -148,7 +161,7 @@ class SegmentGatherer(object):
 
         return result
 
-    def _publish(self, time_slot):
+    def _publish(self, time_slot, missing_files_check=True):
         """Publish file dataset and reinitialize gatherer."""
 
         data = self.slots[time_slot]
@@ -160,16 +173,18 @@ class SegmentGatherer(object):
             for key in delayed_files:
                 file_str += "%s %f seconds, " % (key, delayed_files[key])
             self.logger.warning("Files received late: %s", file_str.strip(', '))
-        # and missing files
-        missing_files = data['all_files'].difference(data['received_files'])
-        if len(missing_files) > 0:
-            self.logger.warning("Missing files: %s", ', '.join(missing_files))
+
+        if missing_files_check:
+            # and missing files
+            missing_files = data['all_files'].difference(data['received_files'])
+            if len(missing_files) > 0:
+                self.logger.warning("Missing files: %s", ', '.join(missing_files))
 
         msg = message.Message(self._subject, "dataset", data['metadata'])
         self.logger.info("Sending: %s", str(msg))
         self._publisher.send(str(msg))
 
-        self._clear_data(time_slot)
+        # self._clear_data(time_slot)
 
     def set_logger(self, logger):
         """Set logger."""
@@ -179,16 +194,30 @@ class SegmentGatherer(object):
         """Determine if slot is ready to be published."""
         # If no files have been collected, return False
         if len(slot['received_files']) == 0:
-            return False
+            return SLOT_NOT_READY
 
         time_slot = str(slot['metadata'][self.time_name])
+
+        wanted_and_critical_files = \
+            slot['wanted_files'].union(slot['critical_files'])
+        num_wanted_and_critical_files_received = \
+            len(wanted_and_critical_files & slot['received_files'])
+
+        self.logger.debug("Got %s wanted or critical files in slot %s.",
+                          num_wanted_and_critical_files_received,
+                          time_slot)
+
+        if num_wanted_and_critical_files_received \
+                == slot['files_till_premature_publish']:
+            slot['files_till_premature_publish'] = -1
+            return SLOT_READY_BUT_WAIT_FOR_MORE
+
         # If all wanted files have been received, return True
-        if slot['wanted_files'].union(\
-                slot['critical_files']).issubset(\
+        if wanted_and_critical_files.issubset(
                 slot['received_files']):
             self.logger.info("All files received for slot %s.",
                              time_slot)
-            return True
+            return SLOT_READY
 
         if slot['critical_files'].issubset(slot['received_files']):
             # All critical files have been received
@@ -198,12 +227,12 @@ class SegmentGatherer(object):
                 self.logger.info("Setting timeout to %s for slot %s.",
                                  str(slot['timeout']),
                                  time_slot)
-                return False
+                return SLOT_NOT_READY
             elif slot['timeout'] < dt.datetime.utcnow():
                 # Timeout reached, collection ready
                 self.logger.info("Timeout occured, required files received "
                                  "for slot %s.", time_slot)
-                return True
+                return SLOT_READY
             else:
                 pass
         else:
@@ -212,7 +241,7 @@ class SegmentGatherer(object):
                 self.logger.info("Setting timeout to %s for slot %s",
                                  str(slot['timeout']),
                                  time_slot)
-                return False
+                return SLOT_NOT_READY
 
             elif slot['timeout'] < dt.datetime.utcnow():
                 # Timeout reached, collection is obsolete
@@ -220,12 +249,12 @@ class SegmentGatherer(object):
                                     "were not present, data discarded for "
                                     "slot %s.",
                                     time_slot)
-                return None
+                return SLOT_OBSOLUTE_TIMEOUT
             else:
                 pass
 
         # Timeout not reached, wait for more files
-        return False
+        return SLOT_NOT_READY
 
     def run(self):
         """Run SegmentGatherer"""
@@ -237,11 +266,14 @@ class SegmentGatherer(object):
             for slot in slots:
                 slot = str(slot)
                 status = self.slot_ready(slots[slot])
-                if status is True:
+                if status == SLOT_READY:
                     # Collection ready, publish and remove
                     self._publish(slot)
                     self._clear_data(slot)
-                elif status is None:
+                if status == SLOT_READY_BUT_WAIT_FOR_MORE:
+                    # Collection ready, publish and but wait for more
+                    self._publish(slot, missing_files_check=False)
+                elif status == SLOT_OBSOLUTE_TIMEOUT:
                     # Collection unfinished and obslote, discard
                     self._clear_data(slot)
                 else:
