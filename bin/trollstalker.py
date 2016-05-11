@@ -58,7 +58,7 @@ class EventHandler(ProcessEvent):
 
     def __init__(self, topic, instrument, posttroll_port=0, filepattern=None,
                  aliases=None, tbus_orbit=False, history=0, nameservers=[],
-                 start_time_offset=0, end_time_offset=1):
+                 start_time_offset=0, end_time_offset=0):
         super(EventHandler, self).__init__()
 
         self._pub = NoisyPublisher("trollstalker", posttroll_port, topic, nameservers=nameservers)
@@ -193,12 +193,14 @@ class EventHandler(ProcessEvent):
                     dt.datetime.combine(self.info["end_date"].date(),
                                         self.info["end_time"].time())
                 del self.info["end_date"]
-            if "end_time" not in self.info:
+
+            if "end_time" not in self.info and self.end_time_offset > 0:
                 self.info["end_time"] = \
                     base_time + dt.timedelta(minutes=self.end_time_offset)
 
-            while self.info["start_time"] > self.info["end_time"]:
-                self.info["end_time"] += dt.timedelta(days=1)
+            if "end_time" in self.info and "start_time" in self.info:
+                while self.info["start_time"] > self.info["end_time"]:
+                    self.info["end_time"] += dt.timedelta(days=1)
 
 
 class NewThreadedNotifier(ThreadedNotifier):
@@ -214,7 +216,7 @@ class NewThreadedNotifier(ThreadedNotifier):
 def create_notifier(topic, instrument, posttroll_port, filepattern,
                     event_names, monitored_dirs, aliases=None,
                     tbus_orbit=False, history=0, nameservers=[],
-                    start_time_offset=0, end_time_offset=1):
+                    start_time_offset=0, end_time_offset=0):
     '''Create new notifier'''
 
     # Event handler observes the operations in defined folder
