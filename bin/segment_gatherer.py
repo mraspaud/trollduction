@@ -122,7 +122,7 @@ class SegmentGatherer(object):
                                                      "all_files"))
 
         self.slots[time_slot]['received_files'] = set([])
-        self.slots[time_slot]['delayed_files'] = set([])
+        self.slots[time_slot]['delayed_files'] = dict()
         self.slots[time_slot]['missing_files'] = set([])
         self.slots[time_slot]['timeout'] = None
         self.slots[time_slot]['files_till_premature_publish'] = \
