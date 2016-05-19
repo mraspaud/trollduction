@@ -266,8 +266,14 @@ def main():
     try:
         while True:
             time.sleep(1)
+            for granule_trigger in granule_triggers:
+                if not granule_trigger.is_alive():
+                    raise RuntimeError
     except KeyboardInterrupt:
         LOGGER.info("Shutting down...")
+    except RuntimeError:
+        LOGGER.critical('Something went wrong!')
+    finally:
         for granule_trigger in granule_triggers:
             granule_trigger.stop()
         PUB.stop()

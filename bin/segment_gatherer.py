@@ -40,7 +40,7 @@ from trollsift import Parser, compose
 SLOT_NOT_READY = 0
 SLOT_READY = 1
 SLOT_READY_BUT_WAIT_FOR_MORE = 2
-SLOT_OBSOLUTE_TIMEOUT = 3
+SLOT_OBSOLETE_TIMEOUT = 3
 
 
 class SegmentGatherer(object):
@@ -249,7 +249,7 @@ class SegmentGatherer(object):
                                     "were not present, data discarded for "
                                     "slot %s.",
                                     time_slot)
-                return SLOT_OBSOLUTE_TIMEOUT
+                return SLOT_OBSOLETE_TIMEOUT
             else:
                 pass
 
@@ -273,7 +273,7 @@ class SegmentGatherer(object):
                 if status == SLOT_READY_BUT_WAIT_FOR_MORE:
                     # Collection ready, publish and but wait for more
                     self._publish(slot, missing_files_check=False)
-                elif status == SLOT_OBSOLUTE_TIMEOUT:
+                elif status == SLOT_OBSOLETE_TIMEOUT:
                     # Collection unfinished and obslote, discard
                     self._clear_data(slot)
                 else:
