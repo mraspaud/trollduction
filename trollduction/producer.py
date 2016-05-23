@@ -1262,10 +1262,17 @@ class DataWriter(Thread):
                                 copy.attrib["thumbnail_name"] = thname
                                 thumbnail(fname, thname, thsize, fformat)
 
+                            if 'uri' in params:
+                                source_uri = [params['uri']]
+                            elif 'dataset' in params:
+                                source_uri = [e['uri'] for e in params['dataset'] if 'uri' in e]
+                            else:
+                                source_uri = None
+
                             msg = _create_message(obj, os.path.basename(fname),
                                                   fname, params,
                                                   publish_topic=self._publish_topic,
-                                                  uid=uid, source_uri=params['uri'])
+                                                  uid=uid, source_uri=source_uri)
                             pub.send(str(msg))
                             LOGGER.debug("Sent message %s", str(msg))
                 except Exception as e:
