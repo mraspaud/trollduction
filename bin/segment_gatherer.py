@@ -151,8 +151,8 @@ class SegmentGatherer(object):
             channel_name, segments = itm.split(':')
             segments = segments.split('-')
             if len(segments) > 1:
-                segments = ['%06d' % i for i in range(int(segments[0]),
-                                                          int(segments[-1])+1)]
+                segments = ['%d' % i for i in range(int(segments[0]),
+                                                    int(segments[-1]) + 1)]
             meta['channel_name'] = channel_name
             for seg in segments:
                 meta['segment'] = seg
