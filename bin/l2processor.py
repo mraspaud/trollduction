@@ -83,6 +83,17 @@ if __name__ == '__main__':
         print "Template file given as master config, aborting!"
         sys.exit()
 
+    # Write thread dumps if stacktracer module available
+    try:
+        from stacktracer import trace_start
+    except ImportError:
+        trace_start = None
+
+    if trace_start is not None:
+        trace_start("{0}/trace_{1}_{2:02d}.html".format(
+            os.path.dirname(args.config_file),
+            args.config_item, args.process_num))
+
     config = ConfigParser()
     config.read(args.config_file)
 

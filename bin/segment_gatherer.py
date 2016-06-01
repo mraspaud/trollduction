@@ -310,7 +310,14 @@ class SegmentGatherer(object):
         except ValueError:
             self.logger.debug("Unknown file, skipping.")
             return
-        time_slot = str(mda[self.time_name])
+
+        metadata = {}
+        for key in msg.data:
+            if key not in ("uid", "uri", "channel_name", "segment"):
+                metadata[key] = msg.data[key]
+        metadata.update(mda)
+
+        time_slot = str(metadata[self.time_name])
 
         # Init metadata etc if this is the first file
         if time_slot not in self.slots:

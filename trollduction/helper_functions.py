@@ -336,6 +336,27 @@ def parse_aliases(config):
     return aliases
 
 
+def parse_vars(config):
+    '''Parse custom variables from the config.
+
+    Aliases are given in the config as:
+
+    {'var_<name>': 'value'}
+
+    where <name> is the name of the key which value will be
+    added to metadata. <value> is a trollsift pattern.
+
+    '''
+    vars = {}
+
+    for key in config:
+        if 'var_' in key:
+            new_key = key.replace('var_', '')
+            var = config[key]
+            vars[new_key] = var
+    return vars
+
+
 def eval_default(expression, default_res=None):
     """Calls eval on expression and returns default_res if it throws
     exceptions

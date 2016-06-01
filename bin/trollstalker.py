@@ -33,7 +33,7 @@ import time
 from posttroll.publisher import NoisyPublisher
 from posttroll.message import Message
 from trollduction import helper_functions
-from trollsift import Parser
+from trollsift import Parser, compose
 from ConfigParser import ConfigParser
 import logging
 import logging.config
@@ -58,7 +58,8 @@ class EventHandler(ProcessEvent):
 
     def __init__(self, topic, instrument, posttroll_port=0, filepattern=None,
                  aliases=None, tbus_orbit=False, history=0, nameservers=[],
-                 start_time_offset=0, end_time_offset=0):
+                 start_time_offset=0, end_time_offset=0,
+                 custom_vars=None):
         super(EventHandler, self).__init__()
 
         self._pub = NoisyPublisher("trollstalker", posttroll_port, topic, nameservers=nameservers)
@@ -70,6 +71,7 @@ class EventHandler(ProcessEvent):
         self.file_parser = Parser(filepattern)
         self.instrument = instrument
         self.aliases = aliases
+        self.custom_vars = custom_vars 
         self.tbus_orbit = tbus_orbit
         self._deque = deque([], history)
         self.start_time_offset = start_time_offset
@@ -202,6 +204,11 @@ class EventHandler(ProcessEvent):
                 while self.info["start_time"] > self.info["end_time"]:
                     self.info["end_time"] += dt.timedelta(days=1)
 
+            if self.custom_vars is not None:
+                for var_name in self.custom_vars:
+                    self.info[var_name] = compose(self.custom_vars[var_name],
+                                                  self.info)
+
 
 class NewThreadedNotifier(ThreadedNotifier):
 
@@ -216,7 +223,8 @@ class NewThreadedNotifier(ThreadedNotifier):
 def create_notifier(topic, instrument, posttroll_port, filepattern,
                     event_names, monitored_dirs, aliases=None,
                     tbus_orbit=False, history=0, nameservers=[],
-                    start_time_offset=0, end_time_offset=0):
+                    start_time_offset=0, end_time_offset=0,
+                    custom_vars=None):
     '''Create new notifier'''
 
     # Event handler observes the operations in defined folder
@@ -240,7 +248,8 @@ def create_notifier(topic, instrument, posttroll_port, filepattern,
                                  history=history,
                                  nameservers=nameservers,
                                  start_time_offset=start_time_offset,
-                                 end_time_offset=end_time_offset)
+                                 end_time_offset=end_time_offset,
+                                 custom_vars=custom_vars)
 
     notifier = NewThreadedNotifier(manager, event_handler)
 
@@ -371,6 +380,8 @@ def main():
         aliases = helper_functions.parse_aliases(config)
         tbus_orbit = bool(config.get("tbus_orbit", False))
 
+        custom_vars = helper_functions.parse_vars(config) 
+        
         try:
             log_config = config["stalker_log_config"]
         except KeyError:
@@ -410,7 +421,8 @@ def main():
                                tbus_orbit=tbus_orbit, history=history,
                                nameservers=nameservers,
                                start_time_offset=start_time_offset,
-                               end_time_offset=end_time_offset)
+                               end_time_offset=end_time_offset,
+                               custom_vars=custom_vars)
     notifier.start()
 
     try:
