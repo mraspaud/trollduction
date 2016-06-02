@@ -156,7 +156,8 @@ class SegmentGatherer(object):
             meta['channel_name'] = channel_name
             for seg in segments:
                 meta['segment'] = seg
-                fname = self._parser.compose(meta)
+                fname = self._parser.globify(
+                    _copy_without_ignore_items(meta))
                 result.add(fname)
 
         return result
@@ -334,7 +335,8 @@ class SegmentGatherer(object):
         except NoOptionError:
             pass
 
-        mask = self._parser.compose(mda)
+        mask = self._parser.globify(
+            _copy_without_ignore_items(mda))
 
         if mask in slot['received_files']:
             return
@@ -352,6 +354,19 @@ class SegmentGatherer(object):
 
         # Add to received files
         slot['received_files'].add(mask)
+        self.logger.info("Add to slot %s: %s", time_slot, mask)
+
+
+def _copy_without_ignore_items(the_dict):
+    """
+    get a copy of *the_dict* without entries having substring
+    'ignore' in key
+    """
+    new_dict = {}
+    for (key, val) in list(the_dict.items()):
+        if 'ignore' not in key:
+            new_dict[key] = val
+    return new_dict
 
 
 def arg_parse():
